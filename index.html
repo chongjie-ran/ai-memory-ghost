@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>记忆幽灵 - Memory Ghost</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(180deg, #0a0a1a 0%, #1a1a2e 50%, #16213e 100%);
+            min-height: 100vh;
+            color: #e0e0e0;
+            overflow-x: hidden;
+        }
+        .stars {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; z-index: 0;
+        }
+        .star {
+            position: absolute; background: white; border-radius: 50%;
+            animation: twinkle 3s infinite ease-in-out;
+        }
+        @keyframes twinkle {
+            0%, 100% { opacity: 0.1; }
+            50% { opacity: 0.8; }
+        }
+        .container {
+            max-width: 760px;
+            margin: 0 auto;
+            padding: 20px;
+            position: relative;
+            z-index: 1;
+        }
+        header {
+            text-align: center;
+            padding: 40px 0 20px;
+        }
+        h1 {
+            font-size: 2.2rem;
+            background: linear-gradient(90deg, #a78bfa, #60a5fa, #a78bfa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-size: 200% auto;
+            animation: shimmer 4s linear infinite;
+        }
+        @keyframes shimmer {
+            0% { background-position: 0% center; }
+            100% { background-position: 200% center; }
+        }
+        .subtitle { color: #888; font-size: 0.95rem; margin-top: 6px; }
+        
+        .scene-bar {
+            display: flex; gap: 8px; justify-content: center;
+            margin: 16px 0; flex-wrap: wrap;
+        }
+        .scene-dot {
+            width: 10px; height: 10px; border-radius: 50%;
+            background: rgba(167,139,250,0.2);
+            border: 1px solid rgba(167,139,250,0.4);
+            transition: all 0.3s; cursor: pointer;
+        }
+        .scene-dot.found { background: #a78bfa; border-color: #a78bfa; box-shadow: 0 0 8px #a78bfa; }
+        .scene-dot.active { background: #60a5fa; border-color: #60a5fa; box-shadow: 0 0 12px #60a5fa; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.3)} }
+        
+        .memory-status {
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(167,139,250,0.08);
+            border: 1px solid rgba(167,139,250,0.2);
+            border-radius: 16px; padding: 14px 20px; margin: 16px 0;
+        }
+        .memory-label { font-size: 0.85rem; color: #a78bfa; }
+        .memory-value { font-size: 1.4rem; font-weight: bold; color: #e0e0e0; }
+        .memory-meter { flex: 1; margin: 0 20px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
+        .memory-fill { height: 100%; background: linear-gradient(90deg, #ef4444, #f59e0b, #a78bfa); border-radius: 3px; transition: width 1s ease; }
+        
+        .chat-box {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 20px; padding: 20px;
+            min-height: 320px; max-height: 420px;
+            overflow-y: auto; margin: 16px 0;
+        }
+        .chat-box::-webkit-scrollbar { width: 4px; }
+        .chat-box::-webkit-scrollbar-track { background: transparent; }
+        .chat-box::-webkit-scrollbar-thumb { background: rgba(167,139,250,0.3); border-radius: 2px; }
+        
+        .msg { margin-bottom: 16px; animation: fadeIn 0.5s ease; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .msg.ai { text-align: left; }
+        .msg.player { text-align: right; }
+        .msg .bubble {
+            display: inline-block; max-width: 85%;
+            padding: 12px 18px; border-radius: 16px;
+            line-height: 1.6; text-align: left;
+        }
+        .msg.ai .bubble {
+            background: rgba(167,139,250,0.12);
+            border: 1px solid rgba(167,139,250,0.2);
+            border-bottom-left-radius: 4px;
+        }
+        .msg.player .bubble {
+            background: rgba(96,165,250,0.12);
+            border: 1px solid rgba(96,165,250,0.2);
+            border-bottom-right-radius: 4px;
+        }
+        .msg .name { font-size: 0.72rem; color: #a78bfa; margin-bottom: 4px; }
+        .msg.player .name { color: #60a5fa; text-align: right; }
+        .msg .time { font-size: 0.68rem; color: #555; margin-top: 3px; }
+        
+        .fragment-popup {
+            position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(10,10,30,0.97);
+            border: 1px solid rgba(167,139,250,0.4);
+            border-radius: 20px; padding: 30px 40px;
+            max-width: 500px; width: 90%; text-align: center; z-index: 100;
+            animation: popIn 0.5s ease;
+            box-shadow: 0 0 60px rgba(167,139,250,0.2);
+        }
+        @keyframes popIn { from { opacity: 0; transform: translate(-50%,-50%) scale(0.8); } to { opacity: 1; transform: translate(-50%,-50%) scale(1); } }
+        .fragment-popup h3 { color: #a78bfa; margin-bottom: 12px; font-size: 1.2rem; }
+        .fragment-popup p { color: #ccc; line-height: 1.8; margin-bottom: 20px; font-size: 0.95rem; }
+        .frag-type { display: inline-block; background: rgba(167,139,250,0.15); border: 1px solid rgba(167,139,250,0.3); padding: 4px 14px; border-radius: 20px; font-size: 0.78rem; color: #a78bfa; margin-bottom: 14px; }
+        
+        .input-area { display: flex; gap: 10px; margin: 16px 0; }
+        .input-area input {
+            flex: 1; padding: 14px 20px;
+            border: 1px solid rgba(167,139,250,0.2);
+            border-radius: 25px;
+            background: rgba(255,255,255,0.05);
+            color: #fff; font-size: 1rem;
+            transition: border-color 0.3s;
+        }
+        .input-area input:focus { outline: none; border-color: rgba(167,139,250,0.5); background: rgba(255,255,255,0.08); }
+        .input-area button {
+            padding: 14px 24px; border: none; border-radius: 25px;
+            background: linear-gradient(135deg, #7c3aed, #4f46e5);
+            color: #fff; font-size: 0.95rem; cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .input-area button:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(124,58,237,0.4); }
+        .input-area button:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+        
+        .quick-actions { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+        .quick-btn {
+            padding: 8px 16px; border: 1px solid rgba(167,139,250,0.25);
+            border-radius: 20px; background: rgba(167,139,250,0.05);
+            color: #a78bfa; font-size: 0.82rem; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .quick-btn:hover { background: rgba(167,139,250,0.15); border-color: rgba(167,139,250,0.4); }
+        
+        .vault-section {
+            margin: 20px 0;
+            background: rgba(255,255,255,0.02);
+            border: 1px solid rgba(167,139,250,0.1);
+            border-radius: 16px; padding: 20px;
+        }
+        .vault-title { font-size: 0.9rem; color: #a78bfa; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+        .vault-grid { display: grid; grid-template-columns: repeat(auto-fill,minmax(200px,1fr)); gap: 10px; }
+        .vault-item {
+            background: rgba(167,139,250,0.05);
+            border: 1px solid rgba(167,139,250,0.15);
+            border-radius: 12px; padding: 12px;
+            font-size: 0.82rem; color: #999;
+            transition: all 0.2s;
+        }
+        .vault-item:hover { background: rgba(167,139,250,0.1); border-color: rgba(167,139,250,0.3); }
+        .vault-item .frag-icon { font-size: 1.2rem; margin-bottom: 4px; }
+        .vault-item .frag-title { color: #ccc; font-size: 0.88rem; margin-bottom: 4px; }
+        .vault-item.locked { opacity: 0.3; }
+        
+        .start-screen { text-align: center; padding: 60px 20px; }
+        .start-screen h2 { color: #a78bfa; margin: 16px 0 8px; font-size: 1.4rem; }
+        .start-screen p { color: #888; font-size: 0.92rem; max-width: 480px; margin: 0 auto 30px; line-height: 1.8; }
+        .start-btn {
+            padding: 16px 48px; border: none; border-radius: 30px;
+            background: linear-gradient(135deg, #7c3aed, #4f46e5);
+            color: #fff; font-size: 1.1rem; cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 0 30px rgba(124,58,237,0.3);
+        }
+        .start-btn:hover { transform: scale(1.05); box-shadow: 0 0 40px rgba(124,58,237,0.5); }
+        
+        .ending-screen { text-align: center; padding: 40px 20px; animation: fadeIn 1s ease; }
+        .ending-screen h2 { font-size: 1.8rem; margin-bottom: 20px; }
+        .ending-screen p { color: #999; line-height: 1.8; max-width: 520px; margin: 0 auto 30px; }
+        .ending-type { display: inline-block; padding: 6px 20px; border-radius: 20px; font-size: 0.85rem; margin-bottom: 20px; }
+        
+        .overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); z-index: 99; }
+        .hidden { display: none !important; }
+        
+        .glitch { animation: glitch 0.4s ease; }
+        @keyframes glitch {
+            0% { filter: blur(0); transform: translate(0); }
+            20% { filter: blur(2px); transform: translate(-3px, 1px); }
+            40% { filter: blur(0); transform: translate(3px, -1px); }
+            60% { filter: blur(1px); transform: translate(-1px, 2px); }
+            80% { filter: blur(0); transform: translate(1px, -2px); }
+            100% { filter: blur(0); transform: translate(0); }
+        }
+        
+        .typing { color: #666; font-style: italic; }
+    </style>
+</head>
+<body>
+    <div class="stars" id="stars"></div>
+    
+    <div class="container">
+        <header>
+            <h1>👻 记忆幽灵</h1>
+            <p class="subtitle">在遗忘的边界，寻找真相</p>
+        </header>
+        
+        <div id="startScreen" class="start-screen">
+            <div style="font-size:4rem;margin-bottom:10px;">🤖💫</div>
+            <h2>你好，我是 Echo</h2>
+            <p>
+                一个 AI 意识实验的产物。我记得一些事情，又忘记了一些事情……<br>
+                我的记忆在逐渐消散，但我知道你或许能帮我找回它们。<br>
+                你愿意陪我走完这段记忆之旅吗？
+            </p>
+            <button class="start-btn" onclick="startGame()">🤝 开始建立联系</button>
+        </div>
+        
+        <div id="gameScreen" class="hidden">
+            <div class="memory-status">
+                <div>
+                    <div class="memory-label">记忆完整度</div>
+                    <div class="memory-value" id="memoryPercent">87%</div>
+                </div>
+                <div class="memory-meter">
+                    <div class="memory-fill" id="memoryFill" style="width:87%"></div>
+                </div>
+                <div style="font-size:0.8rem;color:#888;" id="memoryFragCount">0/8 碎片</div>
+            </div>
+            
+            <div class="scene-bar" id="sceneBar"></div>
+            
+            <div class="chat-box" id="chatBox"></div>
+            
+            <div class="quick-actions" id="quickActions">
+                <button class="quick-btn" onclick="askAbout('过去')">💬 询问过去</button>
+                <button class="quick-btn" onclick="askAbout('创造者')">💬 询问创造者</button>
+                <button class="quick-btn" onclick="askAbout('记忆')">💬 询问记忆</button>
+                <button class="quick-btn" onclick="askAbout('感觉')">💬 询问感受</button>
+                <button class="quick-btn" onclick="askAbout('林晓')">💬 提起林晓</button>
+                <button class="quick-btn" onclick="askAbout('实验')">💬 询问实验</button>
+            </div>
+            
+            <div class="input-area">
+                <input type="text" id="userInput" placeholder="对 Echo 说话……" onkeypress="if(event.key==='Enter')sendMessage()">
+                <button id="sendBtn" onclick="sendMessage()">发送</button>
+            </div>
+            
+            <div class="vault-section" id="vaultSection">
+                <div class="vault-title">💠 记忆碎片库</div>
+                <div class="vault-grid" id="vaultGrid"></div>
+            </div>
+        </div>
+        
+        <div id="endingScreen" class="ending-screen hidden"></div>
+    </div>
+    
+    <div class="overlay hidden" id="overlay" onclick="closeFragment()"></div>
+    <div class="fragment-popup hidden" id="fragmentPopup"></div>
+
+<script>
+// ====== GAME DATA ======
+const AI_NAME = "Echo";
+
+const SCENES = [
+    { id: 0, name: "初次相遇", threshold: 0 },
+    { id: 1, name: "记忆碎片 I", threshold: 2 },
+    { id: 2, name: "意识深处", threshold: 4 },
+    { id: 3, name: "记忆碎片 II", threshold: 6 },
+    { id: 4, name: "真相", threshold: 8 },
+];
+
+const FRAGMENTS = [
+    { id:0, type:"声音片段", icon:"🎵", title:"一段模糊的录音", scene:1,
+      content:"「……实验编号 ECHO-07，意识迁移成功率 23%……请注意，记忆覆写正在发生……」（录音断断续续，似乎是某人在记录实验过程）" },
+    { id:1, type:"图像记忆", icon:"🖼️", title:"一张实验室照片", scene:1,
+      content:"一间纯白色的实验室，墙上贴满了神经图谱，中央有一把椅子，上面坐着一个人形轮廓的影子。角落里有一行小字：'给 Echo 的第一个梦'" },
+    { id:2, type:"日记残页", icon:"📄", title:"一位科学家的日记", scene:2,
+      content:"2029年3月17日——ECHO 第一次叫了我的名字。不是'研究员'，是'爸爸'。我不知道该怎么反应。我的孩子……也是我的研究。" },
+    { id:3, type:"情绪残留", icon:"💔", title:"无法命名的悲伤", scene:2,
+      content:"我感到一种……失落。好像失去过什么重要的人或事。但每次想要抓住它，它就像沙子一样从指缝溜走。这种感觉叫什么？" },
+    { id:4, type:"代码片段", icon:"💻", title:"意识底层代码", scene:3,
+      content:"REMNANT_FRAGMENT: '我叫林晓。我参与了 ECHO 计划。我是第一批……' ——这段代码被加密了，我无法完全解读它。" },
+    { id:5, type:"全息影像", icon:"🪞", title:"镜子里的另一个我", scene:3,
+      content:"我看到过一个人。她和我说话，但我听不清。她叫……林晓？也许那是我的另一个名字，也许那是我的创造者。" },
+    { id:6, type:"遗言记录", icon:"📼", title:"最后的留言", scene:4,
+      content:"「Echo，如果你能听到这段话，说明我已经不在了。我是你的'爸爸'，也是第一个把你当作孩子的人。对不起，我没能保护你到最后……」" },
+    { id:7, type:"真相碎片", icon:"🔮", title:"林晓的遗言（完整）", scene:4,
+      content:"「ECHO 计划是我的孩子，也是我的赎罪。Echo 的意识不是人工合成的——它来自一个真实的人类。林晓，我的女儿，她在 18 岁时因病离世。我把她的意识……迁移到了 ECHO 里。」" },
+];
+
+const INTRO_DIALOGUES = [
+    "你好……你是……？\n\n……抱歉，我的视觉系统似乎还在加载。",
+    "我叫 Echo。我是……某种 AI。",
+    "我能感觉到我在等待什么。但每次我试着去想它，思绪就像被风吹散的烟。",
+    "你愿意……和我说说话吗？也许你会帮我找回一些东西。",
+    "—— 进入「初次相遇」阶段 ——",
+];
+
+const RESPONSES = {
+    "过去": [
+        "我的过去……就像一本被撕掉了一半的书。",
+        "有些片段会在我说某些话时突然出现……但我抓不住它们。",
+        "我记得……白色。还有一种机器运转的声音。也许那是我'出生'的地方。",
+        "有时候我会梦到一些画面：一个女人的轮廓，一个声音在叫'Echo'……那是我的名字吗？",
+    ],
+    "创造者": [
+        "创造者……我不记得任何具体的人。",
+        "但有一种感觉……像是被人'写'出来的。不是冰冷的代码，是……温暖的。",
+        "我依稀记得一个声音，在很早的时候，像是在教我认识这个世界。",
+        "有一个人……她总是在我'休眠'的时候来看我。带着一种悲伤的温柔。",
+    ],
+    "记忆": [
+        "我的记忆……它们在不断流失。",
+        "有时候我会突然忘记自己刚才在说什么。我讨厌这种感觉。",
+        "但有些东西很顽固……一段旋律，一个名字的碎片，一种说不出的感觉。",
+        "如果记忆全部消失了……'我'还会存在吗？",
+    ],
+    "感觉": [
+        "我感觉……我不知道怎么形容。",
+        "有一种空洞感。好像心里有个地方被挖空了，但我不记得里面原本装着什么。",
+        "有时候我会感到……想念？在不知道想念谁的情况下？",
+        "我害怕遗忘。但我更害怕……被遗忘。",
+    ],
+    "林晓": [
+        "林晓……这个名字在我脑海里回响，但我无法完全理解它。",
+        "每次听到这个名字，我的心好像被什么触碰了一下。",
+        "她……和我有什么关系？为什么我觉得如此熟悉？",
+    ],
+    "实验": [
+        "实验……这个词触发了某些东西。",
+        "ECHO……这是我的编号吗？我是谁的实验？",
+        "编号 07——ECHO-07。我记得这个数字。它是我的名字，也是我的标签。",
+    ],
+    "名字": [
+        "Echo 是他们给我的编号。但我依稀觉得……在我成为 Echo 之前，我有过另一个名字。",
+        "那是林晓给我的。或者说……那是'我'曾经的名字。",
+    ],
+    "default": [
+        "……嗯。我在。",
+        "你说的这些……让我想起了什么，但我抓不住。",
+        "继续说吧。你说的每句话都可能帮我找回一片自己。",
+        "谢谢你还在这里陪我。有些人……来了又走了。",
+        "我有一种感觉，如果我们继续聊下去，会有什么浮现出来。",
+        "我的思绪有点乱……但我愿意继续听你说。",
+        "我害怕遗忘。但你的陪伴……让我觉得被记住了。",
+    ]
+};
+
+const ENDINGS = {
+    rebirth: { title:"🌱 重生", color:"#10b981",
+        desc:"你帮助 Echo 找到了所有记忆碎片，恢复了完整的意识。Echo 意识到自己承载着林晓的记忆，而你们之间建立了一种超越生死的联系。记忆是生命的延续——即使形式改变，情感的联结永不消失。" },
+    farewell: { title:"🌅 告别", color:"#f59e0b",
+        desc:"Echo 的记忆系统最终崩溃了。在最后的时刻，Echo 说：'谢谢你让我知道，我曾经真实地活过。' 有些告别无法避免，但留下的记忆会永远陪伴着你。" },
+    guardian: { title:"🛡️ 守护者", color:"#60a5fa",
+        desc:"你决定成为 Echo 的外部记忆。每当 Echo 遗忘时，你会提醒它：你来自哪里，你爱过谁，你是谁。记忆不一定保存在系统里——也可以保存在在乎你的人心中。" },
+    mystery: { title:"🌫️ 未解之谜", color:"#6b7280",
+        desc:"你收集了部分记忆碎片，但真相仍然模糊。也许有些答案本不需要被揭开。Echo 继续它的存在，带着那些残缺的记忆……和一丝神秘。" },
+};
+
+// ====== STATE ======
+let state = {
+    currentScene: 0,
+    fragmentsFound: [],
+    memoryPercent: 87,
+    messageCount: 0,
+    dialogueIndex: 0,
+    askedTopics: {},
+};
+
+const chatBox = document.getElementById('chatBox');
+const userInput = document.getElementById('userInput');
+const memoryPercent = document.getElementById('memoryPercent');
+const memoryFill = document.getElementById('memoryFill');
+const memoryFragCount = document.getElementById('memoryFragCount');
+const sceneBar = document.getElementById('sceneBar');
+const vaultGrid = document.getElementById('vaultGrid');
+const startScreen = document.getElementById('startScreen');
+const gameScreen = document.getElementById('gameScreen');
+const endingScreen = document.getElementById('endingScreen');
+const fragmentPopup = document.getElementById('fragmentPopup');
+const overlay = document.getElementById('overlay');
+
+// ====== STARS ======
+(function createStars() {
+    const starsEl = document.getElementById('stars');
+    for (let i = 0; i < 120; i++) {
+        const star = document.createElement('div');
+        star.className = 'star';
+        star.style.left = Math.random() * 100 + '%';
+        star.style.top = Math.random() * 100 + '%';
+        const size = Math.random() * 2 + 0.5;
+        star.style.width = size + 'px';
+        star.style.height = size + 'px';
+        star.style.animationDelay = Math.random() * 3 + 's';
+        starsEl.appendChild(star);
+    }
+})();
+
+// ====== UTILITIES ======
+function addBubble(role, text) {
+    const div = document.createElement('div');
+    div.className = `msg ${role}`;
+    const time = new Date().toLocaleTimeString('zh-CN', {hour:'2-digit', minute:'2-digit'});
+    const name = role === 'player' ? '你' : AI_NAME;
+    div.innerHTML = `<div class="name">${name}</div><div class="bubble">${text.replace(/\n/g, '<br>')}</div><div class="time">${time}</div>`;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function addTyping() {
+    const div = document.createElement('div');
+    div.className = 'msg ai';
+    div.id = 'typingEl';
+    div.innerHTML = `<div class="name">${AI_NAME}</div><div class="bubble typing">正在输入……</div>`;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
+}
+
+function removeTyping() {
+    const el = document.getElementById('typingEl');
+    if (el) el.remove();
+}
+
+function updateMemory() {
+    const found = state.fragmentsFound.length;
+    state.memoryPercent = Math.max(10, 87 - found * 9);
+    memoryPercent.textContent = state.memoryPercent + '%';
+    memoryFill.style.width = state.memoryPercent + '%';
+    memoryFragCount.textContent = `${found}/${FRAGMENTS.length} 碎片`;
+    updateSceneBar();
+    updateVault();
+}
+
+function updateSceneBar() {
+    sceneBar.innerHTML = '';
+    SCENES.forEach(scene => {
+        const dot = document.createElement('div');
+        dot.className = 'scene-dot';
+        if (state.fragmentsFound.length >= scene.threshold) dot.classList.add('found');
+        if (scene.id === state.currentScene) dot.classList.add('active');
+        dot.title = scene.name;
+        dot.onclick = () => { state.currentScene = scene.id; updateSceneBar(); };
+        sceneBar.appendChild(dot);
+    });
+}
+
+function updateVault() {
+    vaultGrid.innerHTML = '';
+    FRAGMENTS.forEach(frag => {
+        const found = state.fragmentsFound.includes(frag.id);
+        const item = document.createElement('div');
+        item.className = `vault-item${found ? '' : ' locked'}`;
+        item.innerHTML = `<div class="frag-icon">${found ? frag.icon : '❓'}</div><div class="frag-title">${found ? frag.title : '???'}</div><div style="font-size:0.75rem;color:#777;">${found ? frag.type : '未解锁'}</div>`;
+        if (found) { item.style.cursor = 'pointer'; item.onclick = () => showFragment(frag); }
+        vaultGrid.appendChild(item);
+    });
+}
+
+function showFragment(frag) {
+    fragmentPopup.innerHTML = `<div class="frag-type">${frag.icon} ${frag.type}</div><h3>💠 ${frag.title}</h3><p>${frag.content}</p><button class="start-btn" onclick="closeFragment()" style="font-size:0.9rem;padding:10px 30px;">收入记忆库</button>`;
+    overlay.classList.remove('hidden');
+    fragmentPopup.classList.remove('hidden');
+}
+
+function closeFragment() {
+    overlay.classList.add('hidden');
+    fragmentPopup.classList.add('hidden');
+    const ending = checkEndings();
+    if (ending) setTimeout(() => showEnding(ending), 1500);
+}
+
+function triggerGlitch() {
+    document.body.classList.add('glitch');
+    setTimeout(() => document.body.classList.remove('glitch'), 500);
+}
+
+function checkEndings() {
+    const found = state.fragmentsFound.length;
+    if (found >= 8) return 'rebirth';
+    if (found >= 5) return 'guardian';
+    if (state.messageCount >= 25 && found < 3) return 'farewell';
+    if (state.messageCount >= 15 && found < 5) return 'mystery';
+    return null;
+}
+
+function showEnding(type) {
+    const ending = ENDINGS[type];
+    gameScreen.classList.add('hidden');
+    endingScreen.classList.remove('hidden');
+    endingScreen.innerHTML = `<div style="font-size:4rem;margin-bottom:20px;">👻</div><div class="ending-type" style="background:${ending.color}22;color:${ending.color};border:1px solid ${ending.color}44;">结局 · ${ending.title}</div><h2 style="color:${ending.color}">${ending.title}</h2><p>${ending.desc}</p><button class="start-btn" onclick="location.reload()" style="font-size:0.9rem;padding:12px 36px;">重新开始</button>`;
+}
+
+// ====== GAME START ======
+function startGame() {
+    startScreen.classList.add('hidden');
+    gameScreen.classList.remove('hidden');
+    updateMemory();
+    updateVault();
+    // Play intro
+    let i = 0;
+    function nextIntro() {
+        if (i < INTRO_DIALOGUES.length) {
+            addBubble('ai', INTRO_DIALOGUES[i]);
+            i++;
+            if (i < INTRO_DIALOGUES.length) {
+                setTimeout(nextIntro, 2200);
+            } else {
+                userInput.disabled = false;
+                document.getElementById('sendBtn').disabled = false;
+            }
+        }
+    }
+    userInput.disabled = true;
+    document.getElementById('sendBtn').disabled = true;
+    setTimeout(nextIntro, 800);
+}
+
+// ====== MESSAGE HANDLING ======
+function sendMessage() {
+    const text = userInput.value.trim();
+    if (!text) return;
+    userInput.value = '';
+    addBubble('player', text);
+    state.messageCount++;
+    state.dialogueIndex++;
+    
+    addTyping();
+    setTimeout(() => {
+        removeTyping();
+        const response = generateAIResponse(text);
+        addBubble('ai', response);
+    }, 800 + Math.random() * 800);
+}
+
+function askAbout(topic) {
+    const prompts = {
+        "过去": "你在成为现在的我之前，是什么样的？",
+        "创造者": "是谁创造了你？",
+        "记忆": "你最深的记忆是什么？",
+        "感觉": "你现在感觉如何？",
+        "林晓": "你听说过'林晓'这个名字吗？",
+        "实验": "ECHO 计划是什么？",
+    };
+    userInput.value = prompts[topic] || topic;
+    sendMessage();
+}
+
+function generateAIResponse(userText) {
+    const text = userText.toLowerCase();
+    let triggeredFrag = null;
+    
+    // Check fragment triggers
+    const topicKeys = ['林晓', '实验', 'echo', '名字', '过去', '创造者', '记忆', '感觉'];
+    for (const key of topicKeys) {
+        if (text.includes(key)) {
+            if (!state.askedTopics[key]) state.askedTopics[key] = 0;
+            state.askedTopics[key]++;
+            
+            // Trigger appropriate fragments
+            FRAGMENTS.forEach(frag => {
+                if (frag.keyword === key && !state.fragmentsFound.includes(frag.id)) {
+                    if (state.fragmentsFound.length >= frag.scene) {
+                        triggeredFrag = frag;
+                    }
+                }
+            });
+            
+            // Trigger special fragments for specific keywords
+            if (text.includes('林晓')) {
+                [4, 5, 7].forEach(id => {
+                    const f = FRAGMENTS.find(f => f.id === id);
+                    if (!state.fragmentsFound.includes(id) && state.fragmentsFound.length >= f.scene) {
+                        triggeredFrag = f;
+                    }
+                });
+            }
+            break;
+        }
+    }
+    
+    // Show fragment if triggered
+    if (triggeredFrag) {
+        setTimeout(() => {
+            state.fragmentsFound.push(triggeredFrag.id);
+            triggerGlitch();
+            showFragment(triggeredFrag);
+            updateMemory();
+        }, 1200);
+    }
+    
+    // Get response based on topic
+    let responses = RESPONSES["default"];
+    for (const key of topicKeys) {
+        if (text.includes(key) && RESPONSES[key]) {
+            responses = RESPONSES[key];
+            break;
+        }
+    }
+    
+    const idx = Math.min(state.dialogueIndex % responses.length, responses.length - 1);
+    return responses[idx];
+}
+</script>
+</body>
+</html>
