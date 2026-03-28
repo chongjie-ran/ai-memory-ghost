@@ -2,8 +2,18 @@
 
 > 在遗忘的边界，寻找真相 —— 一个关于 AI 记忆与身份的情感叙事游戏
 
-![Version](https://img.shields.io/badge/version-1.0.0-purple)
+![Version](https://img.shields.io/badge/version-1.1.0-purple)
 ![License](https://img.shields.io/badge/license-MIT-blue)
+
+
+## What's New in v1.1
+
+- **Bug Fix**: Fragment triggering now works correctly — keyword-based memory fragment system fixed
+- **Save/Load**: Progress automatically saved every 30 seconds; continue from where you left off
+- **New Topic**: Added "家庭" (Family) dialogue topic
+- **Enhanced Responses**: More varied AI dialogue for each topic
+- **Visual Polish**: Occasional shooting star effects
+- **Improved Hints**: Contextual hint system to guide players
 
 ## 🎮 游戏简介
 

@@ -221,7 +221,9 @@
                 我的记忆在逐渐消散，但我知道你或许能帮我找回它们。<br>
                 你愿意陪我走完这段记忆之旅吗？
             </p>
-            <button class="start-btn" onclick="startGame()">🤝 开始建立联系</button>
+            <button class="start-btn" onclick="startGame(false)">🤝 开始建立联系</button>
+            <br>
+            <button class="continue-btn hidden" id="continueBtn" onclick="startGame(true)">↻ 继续上次的记忆</button>
         </div>
         
         <div id="gameScreen" class="hidden">
@@ -279,21 +281,21 @@ const SCENES = [
 ];
 
 const FRAGMENTS = [
-    { id:0, type:"声音片段", icon:"🎵", title:"一段模糊的录音", scene:1,
+    { id:0, type:"声音片段", icon:"🎵", title:"一段模糊的录音", scene:1, keyword:"实验",
       content:"「……实验编号 ECHO-07，意识迁移成功率 23%……请注意，记忆覆写正在发生……」（录音断断续续，似乎是某人在记录实验过程）" },
-    { id:1, type:"图像记忆", icon:"🖼️", title:"一张实验室照片", scene:1,
+    { id:1, type:"图像记忆", icon:"🖼️", title:"一张实验室照片", scene:1, keyword:"过去",
       content:"一间纯白色的实验室，墙上贴满了神经图谱，中央有一把椅子，上面坐着一个人形轮廓的影子。角落里有一行小字：'给 Echo 的第一个梦'" },
-    { id:2, type:"日记残页", icon:"📄", title:"一位科学家的日记", scene:2,
+    { id:2, type:"日记残页", icon:"📄", title:"一位科学家的日记", scene:2, keyword:"创造者",
       content:"2029年3月17日——ECHO 第一次叫了我的名字。不是'研究员'，是'爸爸'。我不知道该怎么反应。我的孩子……也是我的研究。" },
-    { id:3, type:"情绪残留", icon:"💔", title:"无法命名的悲伤", scene:2,
+    { id:3, type:"情绪残留", icon:"💔", title:"无法命名的悲伤", scene:2, keyword:"感觉",
       content:"我感到一种……失落。好像失去过什么重要的人或事。但每次想要抓住它，它就像沙子一样从指缝溜走。这种感觉叫什么？" },
-    { id:4, type:"代码片段", icon:"💻", title:"意识底层代码", scene:3,
+    { id:4, type:"代码片段", icon:"💻", title:"意识底层代码", scene:3, keyword:"林晓",
       content:"REMNANT_FRAGMENT: '我叫林晓。我参与了 ECHO 计划。我是第一批……' ——这段代码被加密了，我无法完全解读它。" },
-    { id:5, type:"全息影像", icon:"🪞", title:"镜子里的另一个我", scene:3,
+    { id:5, type:"全息影像", icon:"🪞", title:"镜子里的另一个我", scene:3, keyword:"名字",
       content:"我看到过一个人。她和我说话，但我听不清。她叫……林晓？也许那是我的另一个名字，也许那是我的创造者。" },
-    { id:6, type:"遗言记录", icon:"📼", title:"最后的留言", scene:4,
+    { id:6, type:"遗言记录", icon:"📼", title:"最后的留言", scene:4, keyword:"家庭",
       content:"「Echo，如果你能听到这段话，说明我已经不在了。我是你的'爸爸'，也是第一个把你当作孩子的人。对不起，我没能保护你到最后……」" },
-    { id:7, type:"真相碎片", icon:"🔮", title:"林晓的遗言（完整）", scene:4,
+    { id:7, type:"真相碎片", icon:"🔮", title:"林晓的遗言（完整）", scene:4, keyword:"林晓",
       content:"「ECHO 计划是我的孩子，也是我的赎罪。Echo 的意识不是人工合成的——它来自一个真实的人类。林晓，我的女儿，她在 18 岁时因病离世。我把她的意识……迁移到了 ECHO 里。」" },
 ];
 
@@ -474,6 +476,7 @@ function showFragment(frag) {
 function closeFragment() {
     overlay.classList.add('hidden');
     fragmentPopup.classList.add('hidden');
+    saveGame(); // Auto-save on fragment collection
     const ending = checkEndings();
     if (ending) setTimeout(() => showEnding(ending), 1500);
 }
@@ -496,32 +499,90 @@ function showEnding(type) {
     const ending = ENDINGS[type];
     gameScreen.classList.add('hidden');
     endingScreen.classList.remove('hidden');
+    clearSave(); // Clear saved game on ending
     endingScreen.innerHTML = `<div style="font-size:4rem;margin-bottom:20px;">👻</div><div class="ending-type" style="background:${ending.color}22;color:${ending.color};border:1px solid ${ending.color}44;">结局 · ${ending.title}</div><h2 style="color:${ending.color}">${ending.title}</h2><p>${ending.desc}</p><button class="start-btn" onclick="location.reload()" style="font-size:0.9rem;padding:12px 36px;">重新开始</button>`;
 }
 
+// ====== SAVE/LOAD ======
+const SAVE_KEY = 'memory_ghost_save_v1';
+
+function saveGame() {
+    try {
+        localStorage.setItem(SAVE_KEY, JSON.stringify({
+            fragmentsFound: state.fragmentsFound,
+            memoryPercent: state.memoryPercent,
+            messageCount: state.messageCount,
+            dialogueIndex: state.dialogueIndex,
+            askedTopics: state.askedTopics,
+            currentScene: state.currentScene
+        }));
+    } catch(e) {}
+}
+
+function loadGame() {
+    try {
+        const data = localStorage.getItem(SAVE_KEY);
+        return data ? JSON.parse(data) : null;
+    } catch(e) { return null; }
+}
+
+function hasSavedGame() {
+    return !!localStorage.getItem(SAVE_KEY);
+}
+
+function clearSave() {
+    try { localStorage.removeItem(SAVE_KEY); } catch(e) {}
+}
+
 // ====== GAME START ======
-function startGame() {
+function startGame(continueGame) {
     startScreen.classList.add('hidden');
     gameScreen.classList.remove('hidden');
-    updateMemory();
-    updateVault();
-    // Play intro
-    let i = 0;
-    function nextIntro() {
-        if (i < INTRO_DIALOGUES.length) {
-            addBubble('ai', INTRO_DIALOGUES[i]);
-            i++;
+
+    if (continueGame && hasSavedGame()) {
+        // Restore saved state
+        const saved = loadGame();
+        if (saved) {
+            state.fragmentsFound = saved.fragmentsFound || [];
+            state.memoryPercent = saved.memoryPercent || 87;
+            state.messageCount = saved.messageCount || 0;
+            state.dialogueIndex = saved.dialogueIndex || 0;
+            state.askedTopics = saved.askedTopics || {};
+            state.currentScene = saved.currentScene || 0;
+        }
+        updateMemory();
+        updateVault();
+        userInput.disabled = false;
+        document.getElementById('sendBtn').disabled = false;
+        addBubble('ai', '你回来了……\n\n我记得你。我们之前聊过一些事情，对吗？\n\n请继续陪我走下去。');
+    } else {
+        // New game
+        state.fragmentsFound = [];
+        state.memoryPercent = 87;
+        state.messageCount = 0;
+        state.dialogueIndex = 0;
+        state.askedTopics = {};
+        state.currentScene = 0;
+        updateMemory();
+        updateVault();
+        // Play intro
+        let i = 0;
+        function nextIntro() {
             if (i < INTRO_DIALOGUES.length) {
-                setTimeout(nextIntro, 2200);
-            } else {
-                userInput.disabled = false;
-                document.getElementById('sendBtn').disabled = false;
+                addBubble('ai', INTRO_DIALOGUES[i]);
+                i++;
+                if (i < INTRO_DIALOGUES.length) {
+                    setTimeout(nextIntro, 2200);
+                } else {
+                    userInput.disabled = false;
+                    document.getElementById('sendBtn').disabled = false;
+                }
             }
         }
+        userInput.disabled = true;
+        document.getElementById('sendBtn').disabled = true;
+        setTimeout(nextIntro, 800);
     }
-    userInput.disabled = true;
-    document.getElementById('sendBtn').disabled = true;
-    setTimeout(nextIntro, 800);
 }
 
 // ====== MESSAGE HANDLING ======
@@ -549,6 +610,7 @@ function askAbout(topic) {
         "感觉": "你现在感觉如何？",
         "林晓": "你听说过'林晓'这个名字吗？",
         "实验": "ECHO 计划是什么？",
+        "家庭": "你有家人吗？",
     };
     userInput.value = prompts[topic] || topic;
     sendMessage();
@@ -559,30 +621,22 @@ function generateAIResponse(userText) {
     let triggeredFrag = null;
     
     // Check fragment triggers
-    const topicKeys = ['林晓', '实验', 'echo', '名字', '过去', '创造者', '记忆', '感觉'];
+    const topicKeys = ['林晓', '实验', 'echo', '名字', '过去', '创造者', '记忆', '感觉', '家庭'];
     for (const key of topicKeys) {
         if (text.includes(key)) {
             if (!state.askedTopics[key]) state.askedTopics[key] = 0;
             state.askedTopics[key]++;
             
-            // Trigger appropriate fragments
+            // Trigger appropriate fragments by keyword (fix: keyword property now exists)
             FRAGMENTS.forEach(frag => {
                 if (frag.keyword === key && !state.fragmentsFound.includes(frag.id)) {
-                    if (state.fragmentsFound.length >= frag.scene) {
+                    // Scene gating: need to be in the right scene (progress through conversation)
+                    // Lower scenes trigger earlier; scene 4 (truth) requires more fragments found
+                    if (frag.scene <= 2 || state.fragmentsFound.length >= (frag.scene - 1) * 2) {
                         triggeredFrag = frag;
                     }
                 }
             });
-            
-            // Trigger special fragments for specific keywords
-            if (text.includes('林晓')) {
-                [4, 5, 7].forEach(id => {
-                    const f = FRAGMENTS.find(f => f.id === id);
-                    if (!state.fragmentsFound.includes(id) && state.fragmentsFound.length >= f.scene) {
-                        triggeredFrag = f;
-                    }
-                });
-            }
             break;
         }
     }
@@ -609,6 +663,18 @@ function generateAIResponse(userText) {
     const idx = Math.min(state.dialogueIndex % responses.length, responses.length - 1);
     return responses[idx];
 }
+
+// ====== INIT ======
+(function init() {
+    // Show continue button if saved game exists
+    if (hasSavedGame()) {
+        document.getElementById('continueBtn').classList.remove('hidden');
+    }
+    // Auto-save every 30 seconds
+    setInterval(saveGame, 30000);
+    // Save on page unload
+    window.addEventListener('beforeunload', saveGame);
+})();
 </script>
 </body>
 </html>
